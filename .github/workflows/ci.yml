@@ -1,27 +1,47 @@
-# .github/workflows/ci.yml
-name: Python CI
+name: Python CI/CD
 
-# 触发条件：只要有人 push 代码，或者提了 Pull Request，就自动运行
-on: [push, pull_request]
+# 触发条件：只要有人 push 代码
+on: [push]
 
 jobs:
+  # 任务一：跑测试（CI）
   build-and-test:
-    runs-on: ubuntu-latest  # CI 会在一个全新的 Ubuntu 虚拟机里执行
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code  # 第一步：把你的代码拉到 CI 机器上
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python # 第二步：安装 Python 环境
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Install dependencies # 第三步：安装依赖
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests  # 第四步：跑测试！
-        run: |
-          pytest
+      - name: Run tests
+        run: pytest
+
+  # 任务二：自动发布版本（CD）
+  release:
+    needs: build-and-test  # 核心：必须等测试通过才执行！
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'  # 只在 master 分支上触发发布
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # 自动生成版本号，格式：v1.0.1, v1.0.2... (由运行次数决定)
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Auto Release v1.0.${{ github.run_number }}"
+          body: "这是由 CI/CD 流水线自动发布的版本，所有测试均已通过。"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
